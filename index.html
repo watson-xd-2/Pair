@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WhatsApp Bot Pairing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        input, button {
+            padding: 10px;
+            font-size: 16px;
+        }
+        input {
+            width: 80%;
+        }
+        button {
+            width: 18%;
+        }
+        #status, #code, #download {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WhatsApp Bot Pairing</h1>
+    <input type="text" id="phone" placeholder="Phone number (e.g., 1234567890@s.whatsapp.net)">
+    <button id="pairBtn">Pair</button>
+
+    <div id="status"></div>
+    <div id="code"></div>
+    <div id="download"></div>
+
+    <script>
+        const pairBtn = document.getElementById('pairBtn');
+        const phoneInput = document.getElementById('phone');
+        const statusDiv = document.getElementById('status');
+        const codeDiv = document.getElementById('code');
+        const downloadDiv = document.getElementById('download');
+
+        let token = null;
+        let intervalId = null;
+
+        pairBtn.addEventListener('click', async () => {
+            const phone = phoneInput.value.trim();
+            if (!phone) return alert('Please enter a phone number');
+
+            statusDiv.textContent = 'Starting pairing...';
+            codeDiv.textContent = '';
+            downloadDiv.innerHTML = '';
+
+            try {
+                const res = await fetch('/api/pair', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    token = data.token;
+                    codeDiv.textContent = 'Pairing code: ' + data.code;
+                    statusDiv.textContent = 'Waiting for connection...';
+
+                    // Polling for status
+                    intervalId = setInterval(checkStatus, 2000);
+                } else {
+                    statusDiv.textContent = 'Error: ' + data.error;
+                }
+            } catch (err) {
+                statusDiv.textContent = 'Error: ' + err.message;
+            }
+        });
+
+        async function checkStatus() {
+            if (!token) return;
+            try {
+                const res = await fetch('/api/status/' + token);
+                const data = await res.json();
+                if (data.connected) {
+                    statusDiv.textContent = 'Connected! You can download the session.';
+                    clearInterval(intervalId);
+                    downloadDiv.innerHTML = `<a href="/api/download/${token}" download>Download Session ZIP</a>`;
+                } else {
+                    statusDiv.textContent = 'Waiting for connection...';
+                }
+            } catch (err) {
+                statusDiv.textContent = 'Error checking status: ' + err.message;
+            }
+        }
+    </script>
+</body>
+</html>
